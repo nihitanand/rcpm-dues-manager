@@ -609,7 +609,63 @@ function App() {
   const deletePayment=pid=>setConfirm({msg:"Delete this payment?",onOk:()=>{
     savePayments(payments.filter(p=>p.id!==pid)); notify("Deleted","red"); setConfirm(null);
   }});
-  const openInvoice=m=>{const w=window.open("","_blank");w.document.write(invoiceHTML(m,settings,payments));w.document.close();};
+  const API_URL = "https://rcpm-invoice-api.onrender.com/invoice";
+
+  const openInvoice = async (m) => {
+    // Show loading toast
+    setToast({msg:"⏳ Generating PDF… please wait (first load may take 30s)", c:"blue"});
+    try {
+      const payload = {
+        inv_no:      invNo(m.sn, settings.year),
+        inv_date:    new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric"}),
+        primary:     m.primary,
+        spouse:      m.spouse || "",
+        mtype:       m.type,
+        period:      "Jul 2026 – Jun 2027",
+        ry:          settings.year,
+        ri_president:settings.ri_president,
+        dg:          settings.dg,
+        president:   settings.president,
+        secretary:   settings.secretary,
+        treasurer:   settings.treasurer,
+        rate_primary:settings.rate_primary,
+        rate_spouse: settings.rate_spouse,
+        rate_erey:   settings.rate_erey,
+        bank:        settings.bank,
+        acc_name:    settings.acc_name,
+        acc_no:      settings.acc_no,
+        ifsc:        settings.ifsc,
+        upi:         settings.upi,
+        pan:         settings.pan,
+        formation:   settings.formation,
+        addr1:       settings.addr1,
+        addr2:       settings.addr2,
+        club_no:     settings.club_no,
+        district:    settings.district,
+      };
+
+      const resp = await fetch(API_URL, {
+        method:  "POST",
+        headers: {"Content-Type":"application/json"},
+        body:    JSON.stringify(payload),
+      });
+
+      if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+
+      // Get PDF blob and open in new tab
+      const blob = await resp.blob();
+      const url  = URL.createObjectURL(blob);
+      const win  = window.open(url, "_blank");
+
+      // Revoke URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+      setToast({msg:"✅ Invoice PDF ready!", c:"green"});
+    } catch(e) {
+      console.error(e);
+      setToast({msg:"❌ " + e.message, c:"red"});
+    }
+  };
   const openWA=m=>window.open("https://wa.me/?text="+encodeURIComponent(waMsg(m,settings,payments)),"_blank");
   const openReport=()=>{const w=window.open("","_blank");w.document.write(exportReportHTML(members,payments,settings));w.document.close();};
 
@@ -641,7 +697,7 @@ function App() {
 
   return(
     <div className="min-h-screen bg-gray-50">
-      {toast&&<div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-xl text-white text-sm font-bold shadow-xl ${toast.c==="green"?"bg-emerald-500":"bg-red-500"}`}>{toast.msg}</div>}
+      {toast&&<div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-xl text-white text-sm font-bold shadow-xl ${toast.c==="green"?"bg-emerald-500":toast.c==="blue"?"bg-indigo-600":"bg-red-500"}`} style={{maxWidth:"320px"}}>{toast.msg}</div>}
       {confirm&&(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
