@@ -786,7 +786,7 @@ function Dashboard({ onLogout }) {
             <p className="text-center font-semibold text-gray-700 mb-5">{confirm.msg}</p>
             <div className="flex gap-3">
               <button onClick={()=>setConfirm(null)} className="flex-1 py-2.5 bg-gray-100 rounded-xl font-semibold text-sm">Cancel</button>
-              <button onClick={confirm.onOk} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm">Delete</button>
+              <button onClick={confirm.onOk} className={`flex-1 py-2.5 text-white rounded-xl font-semibold text-sm ${confirm.tone==="neutral"?"":"bg-red-600"}`} style={confirm.tone==="neutral"?{background:NAVY}:{}}>{confirm.okLabel||"Delete"}</button>
             </div>
           </div>
         </div>
@@ -861,7 +861,7 @@ function Dashboard({ onLogout }) {
           </button>
           <div style={{width:"1px",height:"12px",background:"rgba(255,255,255,0.15)"}}/>
           <button onClick={()=>{
-              setConfirm({msg:"Log out of RCPM Dues Manager?", onOk:()=>{ setConfirm(null); onLogout(); }});
+              setConfirm({msg:"Log out of RCPM Dues Manager?", okLabel:"Logout", tone:"neutral", onOk:()=>{ setConfirm(null); onLogout(); }});
             }}
             style={{color:"rgba(255,255,255,0.55)",fontSize:"10.5px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:"4px",padding:"2px 6px"}}>
             ⏻ Logout
