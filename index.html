@@ -846,7 +846,7 @@ function Dashboard({ onLogout }) {
     if(filter==="pending"&&st!=="pending") return false;
     if(filter==="partial"&&st!=="partial") return false;
     return true;
-  });
+  }).sort((a,b)=>a.primary.localeCompare(b.primary));
 
   const totalDue=members.reduce((a,m)=>a+calcDues(m,settings),0);
   const totalPaid=payments.reduce((a,p)=>a+Number(p.amount||0),0);
