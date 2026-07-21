@@ -1,0 +1,30 @@
+name: Monthly RCPM Data Backup
+
+on:
+  schedule:
+    # Runs at 03:00 UTC (08:30 AM IST) on the 1st of every month
+    - cron: "0 3 1 * *"
+  workflow_dispatch: {}   # allows manual trigger from GitHub Actions tab too
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests openpyxl
+
+      - name: Run monthly backup script
+        env:
+          FIREBASE_DB_URL:    ${{ secrets.FIREBASE_DB_URL }}
+          GMAIL_ADDRESS:       ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
+          BACKUP_RECIPIENTS:   ${{ secrets.BACKUP_RECIPIENTS }}
+        run: python scripts/monthly_backup.py
