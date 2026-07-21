@@ -394,7 +394,7 @@ async function shareWA() {
 
 // ── Export Report HTML ──
 const exportReportHTML = (members, payments, settings) => {
-  const rows = members.map(m => {
+  const rows = members.slice().sort((a,b)=>a.primary.localeCompare(b.primary)).map(m => {
     const tot=calcDues(m,settings);
     const paid=payments.filter(p=>p.member_sn===m.sn).reduce((a,p)=>a+Number(p.amount||0),0);
     const bal=tot-paid;
@@ -473,7 +473,7 @@ html,body{width:1050px;min-width:1050px;font-family:'Segoe UI',Arial,sans-serif;
       const stCl=r.st==="paid"?"#166534":r.st==="partial"?"#1e40af":"#854d0e";
       const stTx=r.st==="paid"?"✓ Paid":r.st==="partial"?"◑ Partial":"⏳ Pending";
       return `<tr style="background:${bg}">
-        <td style="padding:4px 6px;font-size:8px;color:#666;border-bottom:1px solid #f0f0f0">${r.m.sn}</td>
+        <td style="padding:4px 6px;font-size:8px;color:#666;border-bottom:1px solid #f0f0f0">${i+1}</td>
         <td style="padding:4px 6px;font-size:8.5px;border-bottom:1px solid #f0f0f0">
           <div style="font-weight:700;color:#111">${r.m.primary}</div>
           ${r.m.spouse?`<div style="color:#666;font-size:7.5px">& ${r.m.spouse}</div>`:""}
@@ -752,7 +752,12 @@ function Dashboard({ onLogout }) {
   const openReport=()=>{const w=window.open("","_blank");w.document.write(exportReportHTML(members,payments,settings));w.document.close();};
 
   const exportExcel = () => {
-    const rows = members.map(m => {
+    // Alphabetical order by primary name; display SN = position after sorting (real sn/invoice untouched)
+    const sortedMembers = members.slice().sort((a,b)=>a.primary.localeCompare(b.primary));
+    const displaySnMap = {}; // real sn -> display position
+    sortedMembers.forEach((m,idx)=>{ displaySnMap[m.sn] = idx+1; });
+
+    const rows = sortedMembers.map((m,idx) => {
       const tot  = calcDues(m, settings);
       const paid = payments.filter(p=>p.member_sn===m.sn).reduce((a,p)=>a+Number(p.amount||0),0);
       const bal  = tot - paid;
@@ -760,7 +765,7 @@ function Dashboard({ onLogout }) {
       const mPays= payments.filter(p=>p.member_sn===m.sn);
       const lastPay = mPays.length ? mPays.sort((a,b)=>new Date(b.date)-new Date(a.date))[0] : null;
       return {
-        "SN": m.sn,
+        "SN": idx+1,
         "Primary Name": m.primary,
         "Spouse Name": m.spouse || "",
         "Type": m.type === "couple" ? "Couple" : "Single",
@@ -814,7 +819,7 @@ function Dashboard({ onLogout }) {
         return {
           "Date": p.date,
           "Member": m ? m.primary : `SN ${p.member_sn}`,
-          "SN": p.member_sn,
+          "SN": displaySnMap[p.member_sn] || "",
           "Amount (₹)": Number(p.amount||0),
           "Mode": p.mode,
           "Period": p.period,
@@ -914,7 +919,7 @@ function Dashboard({ onLogout }) {
                   RY {settings.year}
                 </div>
                 <div style={{color:"rgba(255,255,255,0.3)",fontSize:"6.5px"}}>
-                  v1.0 · {new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}
+                  v1.2 · {new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}
                 </div>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
@@ -1111,14 +1116,14 @@ function Dashboard({ onLogout }) {
                   <tr>{["SN","Member","Type","Total Due","Paid","Balance","Status"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-400">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {members.map(m=>{
+                  {members.slice().sort((a,b)=>a.primary.localeCompare(b.primary)).map((m,idx)=>{
                     const tot=calcDues(m,settings);
                     const paid=payments.filter(p=>p.member_sn===m.sn).reduce((a,p)=>a+Number(p.amount||0),0);
                     const bal=tot-paid;
                     const st=payStatus(m,payments,settings);
                     return(
                       <tr key={m.sn} className="hover:bg-gray-50">
-                        <td className="px-4 py-2.5 text-xs text-gray-400">{m.sn}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-400">{idx+1}</td>
                         <td className="px-4 py-2.5"><div className="font-semibold text-gray-800 text-xs">{m.primary}</div>{m.spouse&&<div className="text-xs text-gray-400">& {m.spouse}</div>}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-500">{m.type==="couple"?"Couple":"Single"}</td>
                         <td className="px-4 py-2.5 font-bold text-xs" style={{color:NAVY}}>{fmt(tot)}</td>
