@@ -12,6 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 body{font-family:'Inter',system-ui,sans-serif;}
 .status-paid{background:#dcfce7;color:#166534;}
@@ -750,6 +751,86 @@ function Dashboard({ onLogout }) {
   const openWA=m=>window.open("https://wa.me/?text="+encodeURIComponent(waMsg(m,settings,payments)),"_blank");
   const openReport=()=>{const w=window.open("","_blank");w.document.write(exportReportHTML(members,payments,settings));w.document.close();};
 
+  const exportExcel = () => {
+    const rows = members.map(m => {
+      const tot  = calcDues(m, settings);
+      const paid = payments.filter(p=>p.member_sn===m.sn).reduce((a,p)=>a+Number(p.amount||0),0);
+      const bal  = tot - paid;
+      const st   = payStatus(m, payments, settings);
+      const mPays= payments.filter(p=>p.member_sn===m.sn);
+      const lastPay = mPays.length ? mPays.sort((a,b)=>new Date(b.date)-new Date(a.date))[0] : null;
+      return {
+        "SN": m.sn,
+        "Primary Name": m.primary,
+        "Spouse Name": m.spouse || "",
+        "Type": m.type === "couple" ? "Couple" : "Single",
+        "Invoice No": invNo(m.sn, settings.year),
+        "Total Due (₹)": tot,
+        "Paid (₹)": paid,
+        "Balance (₹)": bal,
+        "Status": st === "paid" ? "Paid" : st === "partial" ? "Partial" : "Pending",
+        "Last Payment Date": lastPay ? lastPay.date : "",
+        "Last Payment Mode": lastPay ? lastPay.mode : "",
+        "Phone 1": m.phone1 || "",
+        "Phone 2": m.phone2 || "",
+      };
+    });
+
+    const totalDueSum  = members.reduce((a,m)=>a+calcDues(m,settings),0);
+    const totalPaidSum = payments.reduce((a,p)=>a+Number(p.amount||0),0);
+
+    // Summary sheet data
+    const summaryData = [
+      ["RCPM Dues Manager — Collection Report"],
+      [`Rotary Year ${settings.year} · Generated ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric"})}`],
+      [],
+      ["Total Due", totalDueSum],
+      ["Collected", totalPaidSum],
+      ["Pending", totalDueSum-totalPaidSum],
+      ["Collection %", `${(totalPaidSum/totalDueSum*100).toFixed(1)}%`],
+      ["Total Members", members.length],
+      ["Paid Members", members.filter(m=>payStatus(m,payments,settings)==="paid").length],
+      ["Partial Members", members.filter(m=>payStatus(m,payments,settings)==="partial").length],
+      ["Pending Members", members.filter(m=>payStatus(m,payments,settings)==="pending").length],
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    wsSummary["!cols"] = [{wch:20},{wch:25}];
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+    const wsMembers = XLSX.utils.json_to_sheet(rows);
+    wsMembers["!cols"] = [
+      {wch:6},{wch:24},{wch:24},{wch:9},{wch:18},
+      {wch:13},{wch:13},{wch:13},{wch:10},{wch:16},{wch:14},{wch:13},{wch:13}
+    ];
+    XLSX.utils.book_append_sheet(wb, wsMembers, "Member-wise Report");
+
+    const paymentRows = payments
+      .slice()
+      .sort((a,b)=>new Date(b.date)-new Date(a.date))
+      .map(p => {
+        const m = members.find(x=>x.sn===p.member_sn);
+        return {
+          "Date": p.date,
+          "Member": m ? m.primary : `SN ${p.member_sn}`,
+          "SN": p.member_sn,
+          "Amount (₹)": Number(p.amount||0),
+          "Mode": p.mode,
+          "Period": p.period,
+          "Reference": p.ref || "",
+          "Notes": p.notes || "",
+        };
+      });
+    const wsPayments = XLSX.utils.json_to_sheet(paymentRows);
+    wsPayments["!cols"] = [{wch:12},{wch:24},{wch:6},{wch:13},{wch:12},{wch:10},{wch:16},{wch:24}];
+    XLSX.utils.book_append_sheet(wb, wsPayments, "Payment History");
+
+    const fname = `RCPM_Collection_Report_${settings.year}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    notify("✅ Excel report downloaded!");
+  };
+
   const filtered=members.filter(m=>{
     const ns=(m.primary+" "+m.spouse).toLowerCase();
     if(search&&!ns.includes(search.toLowerCase())) return false;
@@ -1006,9 +1087,14 @@ function Dashboard({ onLogout }) {
               <h1 className="text-2xl font-black text-gray-900">Collection Report</h1>
               <p className="text-sm text-gray-400">Rotary Year {settings.year} · {settings.theme}</p>
             </div>
-            <button onClick={openReport} className="text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm" style={{background:NAVY}}>
-              📥 Export (PDF / JPEG)
-            </button>
+            <div className="flex gap-2">
+              <button onClick={openReport} className="text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm" style={{background:NAVY}}>
+                📥 Export (PDF / JPEG)
+              </button>
+              <button onClick={exportExcel} className="text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm" style={{background:"#1D6F42"}}>
+                📊 Export Excel
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
             {[{l:"Total Due",v:fmt(totalDue),c:NAVY},{l:"Collected",v:fmt(totalPaid),c:"#059669"},{l:"Pending",v:fmt(totalDue-totalPaid),c:"#d97706"},{l:"Collection %",v:`${(totalPaid/totalDue*100).toFixed(1)}%`,c:"#7c3aed"}].map(s=>(
